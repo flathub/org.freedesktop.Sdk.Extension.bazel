@@ -1,26 +1,30 @@
 id: org.freedesktop.Sdk.Extension.bazel
-branch: '20.08'
+branch: '23.08'
 runtime: org.freedesktop.Sdk
 build-extension: true
 sdk: org.freedesktop.Sdk
-runtime-version: '20.08'
+runtime-version: '23.08'
 separate-locales: false
 appstream-compose: false
 modules:
   - name: bazel
     buildsystem: simple
+    build-options:
+      strip: false
+      no-debuginfo: true
+      no-debuginfo-compression: true
     sources:
       - type: file
         only-arches:
           - x86_64
-        url: https://github.com/bazelbuild/bazel/releases/download/4.0.0/bazel-4.0.0-linux-x86_64
-        sha256: 7bee349a626281fc8b8d04a7a0b0358492712377400ab12533aeb39c2eb2b901
+        url: https://github.com/bazelbuild/bazel/releases/download/6.3.2/bazel-6.3.2-linux-x86_64
+        sha256: e78fc3394deae5408d6f49a15c7b1e615901969ecf6e50d55ef899996b0b8458
         dest-filename: bazel
       - type: file
         only-arches:
           - aarch64
-        url: https://github.com/bazelbuild/bazel/releases/download/4.0.0/bazel-4.0.0-linux-arm64
-        sha256: a714c94ffccfacd20e5ea15d94ea26b3d64c9e1a12c048355f18b38cbe32d6ae
+        url: https://github.com/bazelbuild/bazel/releases/download/6.3.2/bazel-6.3.2-linux-arm64
+        sha256: 9d88a0b206e22cceb4afe0060be7f294b423f5f49b18750fbbd7abd47cea4054
         dest-filename: bazel
     build-commands:
       - chmod +x bazel
