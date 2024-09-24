@@ -35,7 +35,7 @@ modules:
     sources:
       - type: script
         commands:
-          - export PATH=$PATH:/usr/lib/sdk/bazel/bin/bazel
+          - export PATH=$PATH:/usr/lib/sdk/bazel/bin
         dest-filename: enable.sh
     buildsystem: simple
     build-commands:
