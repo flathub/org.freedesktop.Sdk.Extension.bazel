@@ -5,7 +5,6 @@ build-extension: true
 sdk: org.freedesktop.Sdk
 runtime-version: '24.08'
 separate-locales: false
-appstream-compose: false
 modules:
   - name: bazel
     buildsystem: simple
@@ -44,9 +43,7 @@ modules:
   - name: appdata
     buildsystem: simple
     build-commands:
-    - mkdir -p ${FLATPAK_DEST}/share/appdata
-    - cp org.freedesktop.Sdk.Extension.bazel.appdata.xml ${FLATPAK_DEST}/share/appdata
-    - appstream-compose --basename=org.freedesktop.Sdk.Extension.bazel --prefix=${FLATPAK_DEST} --origin=flatpak org.freedesktop.Sdk.Extension.bazel
+    - install -Dm0644 org.freedesktop.Sdk.Extension.bazel.appdata.xml ${FLATPAK_DEST}/share/appdata
     sources:
     - type: file
       path: org.freedesktop.Sdk.Extension.bazel.appdata.xml
