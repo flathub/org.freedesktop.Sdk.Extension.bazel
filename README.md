@@ -52,7 +52,7 @@ In order to trigger the dependency download for the target you need, one may use
 
      ```yaml
      build-commands:
-       - bazel build --distdir=$PWD/bazel-deps --registry=$PWD/bcr //path/to/target:name
+       - bazel build --distdir=$PWD/bazel-deps --registry=file:///$PWD/bcr //path/to/target:name
      sources:
        - type: file
          url: [url to a dependency file, can be extracted from the content of id-* files from the repository cache directory]
@@ -86,7 +86,7 @@ In order to trigger the dependency download for the target you need, one may use
      Add either `- projects-deps.yaml` or `- projects-deps.json` to the sources.
      ```yaml
      build-commands:
-       - bazel build --distdir=$PWD/bazel-deps --registry=$PWD/bcr //path/to/target:name
+       - bazel build --distdir=$PWD/bazel-deps --registry=file:///$PWD/bcr //path/to/target:name
      sources:
        - type: git
          url: https://github.com/bazelbuild/bazel-central-registry.git
