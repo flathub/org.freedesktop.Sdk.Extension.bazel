@@ -27,7 +27,7 @@ In order to trigger the dependency download for the target you need, one may use
 
 1. As another approach, Run `bazel build --nobuild` to trigger the downloading process of external dependencies.
     ```bash
-    bazel build --nobuild --repository_cache="/path/to/cache" [--config config_name] --experimental_repository_resolved_file=resolved.bzl //path/to/target1:name //path/to/target2:name .. 
+    bazel build --nobuild --repository_cache="/path/to/cache" [--config config_name] --experimental_repository_resolved_file=resolved.bzl //path/to/target1:name //path/to/target2:name ..
     ```
 
 1. Inspect the repository cache directory, there are two options to use it with flatpak.
@@ -71,7 +71,7 @@ In order to trigger the dependency download for the target you need, one may use
 
      The following is the approach as of bazel 7.3.1. It should be valid as long as the format of resolved.bzl doesn't change.
      ```sh
-     bazel build --nobuild --repository_cache="/path/to/cache" [--config config_name] --experimental_repository_resolved_file=resolved.bzl //path/to/target1:name //path/to/target2:name .. 
+     bazel build --nobuild --repository_cache="/path/to/cache" [--config config_name] --experimental_repository_resolved_file=resolved.bzl //path/to/target1:name //path/to/target2:name ..
      ```
      Process resolved.bzr with the sed command to make it easier to handle with the jq command.
      ```sh
@@ -95,6 +95,22 @@ In order to trigger the dependency download for the target you need, one may use
        - projects-deps.yaml
        ...
      ```
+
+     There is another approach using the --experimental_downloader_config option.  
+     Using this option, you can make Bazel fetch files through a proxy server. You could set up a simple local proxy server and have it create a URL structure and a list of files to download. This can help you confirm the group of files to be saved in distdir.  
+     However, be aware that the attribute information equivalent to downloaded_file_path in resolve.bzl might be insufficient. In other words, be cautious that you might not be able to obtain the information if a separate dest-filename is needed. In that case, it should be possible to supplement the missing information from resolved.bzl.  
+     ( We won't go into detail about the proxy server configuration here. )
+
+     ```sh
+     cat downloder.cfg
+     ```
+     ```txt:downloader.cfg
+     rewrite (.*) http://127.0.0.1:8000/$1
+     ```
+     ```sh
+     bazel build --nobuild --repository_cache="/path/to/cache" [--config config_name] --experimental_downloader_config=downloader.cfg --experimental_repository_resolved_file=resolved.bzl //path/to/target1:name //path/to/target2:name ..
+     ```
+
 
 Alternatively, you can add the following to your module if bazel wants to download some dependencies of its own:
 
