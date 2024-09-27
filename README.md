@@ -6,9 +6,16 @@ To build things using bazel, add the following to your manifest file:
 
 ```yaml
 add-build-extensions:
-  - org.freedesktop.Sdk.Extension.bazel
+  org.freedesktop.Sdk.Extension.bazel:
+    directory: lib/sdk/bazel
+    version: "24.08"
 build-options:
   append-path: /usr/lib/sdk/bazel/bin
+```
+or
+```yaml
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.bazel
 ```
 
 To build with flatpak without network access, you may use the new feature introduced with bazel 7.
