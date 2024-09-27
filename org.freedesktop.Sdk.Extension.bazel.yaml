@@ -42,11 +42,11 @@ modules:
       - cp enable.sh /usr/lib/sdk/bazel/
 
   - name: appdata
+    sources:
+      - type: file
+        path: org.freedesktop.Sdk.Extension.bazel.metainfo.xml
     buildsystem: simple
     build-commands:
-      - install -Dm0644 org.freedesktop.Sdk.Extension.bazel.appdata.xml ${FLATPAK_DEST}/share/appdata
-      - appstreamcli compose  --prefix=/ --origin=${FLATPAK_ID} --result-root=${FLATPAK_DEST} --data-dir=${FLATPAK_DEST}/share/app-info/xmls ${FLATPAK_DEST}
+      - install -Dm0644 org.freedesktop.Sdk.Extension.bazel.metainfo.xml ${FLATPAK_DEST}/share/metainfo/org.freedesktop.Sdk.Extension.bazel.metainfo.xml
+      - appstreamcli compose --prefix=/ --origin=${FLATPAK_ID} --result-root=${FLATPAK_DEST} --data-dir=${FLATPAK_DEST}/share/metainfo ${FLATPAK_DEST}
 
-    sources:
-    - type: file
-      path: org.freedesktop.Sdk.Extension.bazel.appdata.xml
