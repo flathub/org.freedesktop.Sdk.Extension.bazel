@@ -1,0 +1,376 @@
+name: Sync Main Branch
+
+on:
+  schedule:
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+
+env:
+  ORIGINAL_REPO: flathub/org.freedesktop.Sdk.Extension.bazel
+  MAIN_BRANCH: branch/24.08
+  SUB_BRANCH: branch/23.08
+
+jobs:
+  sync-main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "Masato TOYOSHIMA"
+          git config user.email "phoepsilonix@phoepsilonix.love"
+
+      - name: Sync Main Branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.BAZEL_TOKEN }}
+        run: |
+          echo "Fetching from original repository..."
+          git fetch https://github.com/$ORIGINAL_REPO.git $MAIN_BRANCH
+
+          echo "Resetting local $MAIN_BRANCH to FETCH_HEAD..."
+          git checkout $MAIN_BRANCH
+          if [ -z "$(git diff $MAIN_BRANCH~..FETCH_HEAD)" ]; then
+            echo "No changes detected. Exiting."
+          else
+            git reset --hard FETCH_HEAD
+            echo "Ensuring sync-branch.yaml exists..."
+            if [ ! -f .github/workflows/sync-branch.yaml ]; then
+              echo "Restoring sync-branch.yaml from previous commit..."
+              git checkout HEAD@{1} -- .github/workflows/sync-branch.yaml
+              git add .github/workflows/sync-branch.yaml
+              git commit -m "Restore sync-branch.yaml"
+            fi
+            echo "Pushing changes to origin $MAIN_BRANCH..."
+            git push origin $MAIN_BRANCH --force
+          fi
+          git fetch https://github.com/$ORIGINAL_REPO.git $SUB_BRANCH
+          echo "Resetting local $SUB_BRANCH to FETCH_HEAD..."
+          git checkout $SUB_BRANCH
+          if [ -z "$(git diff $SUB_BRANCH..FETCH_HEAD)" ]; then
+            echo "No changes detected. Exiting."
+          else
+            git reset --hard FETCH_HEAD
+            echo "Pushing changes to origin $SUB_BRANCH..."
+            git push origin $SUB_BRANCH --force
+          fi
+
+  version-check:
+    needs: sync-main
+    runs-on: ubuntu-latest
+    outputs:
+      LATEST_LOG: ${{ steps.bazel.outputs.LATEST_LOG }}
+      RELEASE_VERSION: ${{ steps.bazel.outputs.RELEASE_VERSION }}
+      BAZEL_URLS: ${{ steps.bazel.outputs.BAZEL_URLS }}
+      UPDATES: ${{ steps.bazel.outputs.UPDATES }}
+      APT_CACHE_HASH: ${{ steps.final-cache-hash.outputs.FINAL_CACHE_HASH }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set custom apt cache directory
+        run: |
+          mkdir -p ${{ github.workspace }}/.apt-cache/
+          echo 'Dir::Cache::Archives "${{ github.workspace }}/.apt-cache/";' | sudo tee /etc/apt/apt.conf.d/01custom-cache
+
+      - name: Generate initial apt cache hash
+        id: initial-cache-hash
+        run: |
+          HASH=$(find ${{ github.workspace }}/.apt-cache -type f -name "*.deb" -exec sha256sum {} + | sort | sha256sum | cut -d ' ' -f1)
+          echo "INITIAL_CACHE_HASH=${HASH}" >> $GITHUB_OUTPUT
+
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.apt-cache
+          key: ${{ runner.os }}-apt-${{ steps.initial-cache-hash.outputs.INITIAL_CACHE_HASH }}
+
+      - name: install jq and yq and xq
+        run: |
+          sudo apt-get update
+          sudo apt-get install jq pipx
+          pipx install yq
+          yq --version
+          jq --version
+
+      - name: Adjust permissions after apt operations
+        run: |
+          sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}/.apt-cache
+          sudo chmod -R 700 ${{ github.workspace }}/.apt-cache
+          sudo rm -f ${{ github.workspace }}/.apt-cache/lock ${{ github.workspace }}/.apt-cache/partial/*
+
+      - name: Generate final apt cache hash
+        id: final-cache-hash
+        run: |
+          HASH=$(find ${{ github.workspace }}/.apt-cache -type f -name "*.deb" -exec sha256sum {} + | sort | sha256sum | cut -d ' ' -f1)
+          echo "FINAL_CACHE_HASH=${HASH}" >> $GITHUB_OUTPUT
+
+      - name: Update cache if changed
+        if: steps.initial-cache-hash.outputs.INITIAL_CACHE_HASH != steps.final-cache-hash.outputs.FINAL_CACHE_HASH
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/.apt-cache
+          key: ${{ runner.os }}-apt-${{ steps.final-cache-hash.outputs.FINAL_CACHE_HASH }}
+
+      - name: Get latest Bazel release version
+        id: bazel
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.BAZEL_TOKEN }}
+        run: |
+          # Latest Release
+          LATEST_LOG=$(curl -s https://api.github.com/repos/bazelbuild/bazel/releases/latest)
+          RELEASE_VERSION=$(echo "$LATEST_LOG" | jq -r .tag_name)
+          echo "Latest Bazel release version: $RELEASE_VERSION"
+
+          # short name
+          ln -s org.freedesktop.Sdk.Extension.bazel.yaml bazel.yaml
+
+          FLATPAK_BAZEL_VER=$(yq -r ".modules|.[]|.sources|.[]|select(.url != null) .url" bazel.yaml |head -n1|grep -Eo "/[0-9]*\.[0-9]*\.[0-9]*/"|cut -f2 -d"/")
+          echo "Flatpak version of Bazel: $FLATPAK_BAZEL_VER"
+          BAZEL_URLS=$(echo "$LATEST_LOG"| jq -r '.assets|.[]|select(.name|contains("bazel-'${RELEASE_VERSION}'-linux") and (contains(".sha256")|not) and (contains(".sig")|not))|.browser_download_url')
+          echo -e "Bazel URL:\n$BAZEL_URLS"
+
+          # outputs
+          echo "LATEST_LOG="$LATEST_LOG"" >> $GITHUB_OUTPUT
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "FLATPAK_BAZEL_VERSION=$FLATPAK_BAZEL_VER" >> $GITHUB_OUTPUT
+          echo "BAZEL_URLS="$BAZEL_URLS"" >> $GITHUB_OUTPUT
+
+          if [[ "$RELEASE_VERSION" == "$FLATPAK_BAZEL_VER" ]]; then
+            echo "The Bazel version for Flatpak is the latest release version."
+            echo "No updates are necessary."
+            echo "UPDATES=false" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "UPDATES=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check CheckSum and Signature
+        id: Check
+        if: steps.bazel.outputs.UPDATES == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.BAZEL_TOKEN }}
+          LATEST_LOG: ${{ steps.bazel.outputs.LATEST_LOG }}
+          RELEASE_VERSION: ${{ steps.bazel.outputs.RELEASE_VERSION }}
+          BAZEL_URLS: ${{ steps.bazel.outputs.BAZEL_URLS }}
+        shell: bash
+        run: |
+          echo "Fetching from original repository..."
+          # bazel
+          curl -sLOO $BAZEL_URLS
+          # checksum
+
+          CHECKSUM_URLS=$(echo "$LATEST_LOG"| jq -r '.assets|.[]|select(.name|contains("bazel-'${RELEASE_VERSION}'-linux") and contains("sha256"))|.browser_download_url')
+
+          # fetch and sha256sum
+          curl -sL $CHECKSUM_URLS -o- -o- > SHA256SUMS
+          if [[ $(sha256sum -c SHA256SUMS) ]]; then
+            echo "CHECKSUM Ok"
+            echo "CHECKSUM_OK=1" >> $GITHUB_OUTPUT
+          else
+            echo "CHECKSUM Error"
+            echo "CHECKSUM_OK=0" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          # signature
+          SIG_URLS=$(echo "$LATEST_LOG"| jq -r '.assets|.[]|select(.name|contains("bazel-'${RELEASE_VERSION}'-linux") and contains(".sig"))|.browser_download_url')
+          #gpg --recv-keys 71A1D0EFCFEB6281FD0437C93D5919B448457EE0 || true
+          #(echo 5; echo y; echo quit) | gpg --command-fd 0 --expert --edit-key 71A1D0EFCFEB6281FD0437C93D5919B448457EE0 trust
+          curl -sLOO $SIG_URLS
+          curl -LO https://bazel.build/bazel-release.pub.gpg
+          gpg --import bazel-release.pub.gpg
+          for URL in $SIG_URLS;
+          do
+            gpg --keyring ./bazel-release.pub.gpg --verify $(basename $URL)
+            VERIFY_STATUS=$?
+            if [ $VERIFY_STATUS -eq 0 ]; then
+              echo "Verification successful: The file is legitimate and has not been tampered with."
+              echo "SIG_OK=1" >> $GITHUB_OUTPUT
+            else
+              echo "Verification failed: The file may have been tampered with or the signature is invalid."
+              echo "SIG_OK=0" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          done
+
+  update-repo:
+    needs: version-check
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.BAZEL_TOKEN }}
+      LATEST_LOG: ${{ needs.version-check.outputs.LATEST_LOG }}
+      RELEASE_VERSION: ${{ needs.version-check.outputs.RELEASE_VERSION }}
+      BAZEL_URLS: ${{ needs.version-check.outputs.BAZEL_URLS }}
+      APT_CACHE_HASH: ${{ needs.version-check.outputs.APT_CACHE_HASH }}
+    if: needs.version-check.outputs.UPDATES == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set custom apt cache directory
+        run: |
+          mkdir -p ${{ github.workspace }}/.apt-cache/
+          echo 'Dir::Cache::Archives "${{ github.workspace }}/.apt-cache/";' | sudo tee /etc/apt/apt.conf.d/01custom-cache
+      - uses: actions/cache@v4
+        with:
+          path: $HOME/apt-cache
+          key: ${{ runner.os }}-apt-$APT_CACHE_HASH
+
+      - name: install jq and yq and xq
+        run: |
+          sudo apt-get update
+          sudo apt-get install jq pipx
+          pipx install yq
+          yq --version
+          jq --version
+
+      - name: Configure Git
+        run: |
+          git config user.name "Masato TOYOSHIMA"
+          git config user.email "phoepsilonix@phoepsilonix.love"
+
+      - name: Update metainfo and build.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # short name
+          ln -sf org.freedesktop.Sdk.Extension.bazel.yaml bazel.yaml
+          ln -sf org.freedesktop.Sdk.Extension.bazel.metainfo.xml bazel.xml
+
+          # Update
+          # metainfo xml
+          echo "Update metainfo"
+          RELEASE_DATE=$(echo "$LATEST_LOG"|jq ".body"|grep -Eo "${RELEASE_VERSION} \([0-9\-]*\)"|cut -d" " -f2|tr -d '()')
+          echo "$RELEASE_VERSION ($RELEASE_DATE)"
+
+          # PR用のブランチ作成
+          # PR-branch 24.08
+          PR_BRANCH="PR-bazel-$MAIN_BRANCH"
+          git branch -d $PR_BRANCH || true
+          git push origin --delete $PR_BRANCH || true
+          git checkout -b $PR_BRANCH origin/$MAIN_BRANCH
+
+          xq -i --xml-dtd -x '.component.releases.release = [{"@version": "'${RELEASE_VERSION}'", "@date": "'$RELEASE_DATE'"}] + .component.releases.release' bazel.xml
+          # 閉じタグ変更
+          sed -i -e 's|></release>|/>|g' bazel.xml
+          #echo "utf-8 -> UTF-8"
+          #sed -i -e '1s/utf-8/UTF-8/' bazel.xml
+
+          FLATPAK_BAZEL_URLS=$(yq -r '.modules|.[]|.sources|.[]|select(.url != null)|select( .url | contains("bazel-")) .url' bazel.yaml)
+          #
+          echo "Update NEW URL and CheckSum"
+          for OLD_URL in $FLATPAK_BAZEL_URLS;
+          do
+            OLD_SHA256=`yq -r '.modules|.[]|.sources|.[]|select(.url=="'$OLD_URL'")| .sha256' bazel.yaml`
+            echo "$OLD_URL : $OLD_SHA256"
+            NEW_URL=`echo $BAZEL_URLS|xargs -n1|grep "${OLD_URL##*-}"`
+            NEW_SHA256=`grep $(basename $NEW_URL) SHA256SUMS |cut -f1 -d" "`
+            echo "$NEW_URL : $NEW_SHA256"
+            sed "s|${OLD_URL}|${NEW_URL}|g" -i bazel.yaml
+            sed "s|${OLD_SHA256}|${NEW_SHA256}|g" -i bazel.yaml
+          done
+          git diff
+
+          git commit -m "Update bazel to the $RELEASE_VERSION in the $MAIN_BRANCH" -a
+          git push --set-upstream origin $PR_BRANCH --force-with-lease
+
+          # PR-branch 23.08
+          git fetch https://github.com/$ORIGINAL_REPO.git $SUB_BRANCH
+          PR_BRANCH="PR-bazel-$SUB_BRANCH"
+          git branch -d $PR_BRANCH || true
+          git push origin --delete $PR_BRANCH || true
+          git checkout -b $PR_BRANCH FETCH_HEAD
+
+          git diff $MAIN_BRANCH..PR-bazel-$MAIN_BRANCH -- org.freedesktop.Sdk.Extension.bazel.*|patch -p1 -i-
+          git diff
+          git commit -m "Update bazel to the $RELEASE_VERSION in the $SUB_BRANCH" -a
+          git push --set-upstream origin $PR_BRANCH --force-with-lease
+
+  pr-create:
+    needs: update-repo
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        branch: [ $MAIN_BRANCH , $SUB_BRANCH ]
+    env:
+      LATEST_LOG: ${{ needs.version-check.outputs.LATEST_LOG }}
+      RELEASE_VERSION: ${{ needs.version-check.outputs.RELEASE_VERSION }}
+      APT_CACHE_HASH: ${{ needs.version-check.outputs.APT_CACHE_HASH }}
+    if: needs.version-check.outputs.UPDATES == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set custom apt cache directory
+        run: |
+          mkdir -p ${{ github.workspace }}/.apt-cache/
+          echo 'Dir::Cache::Archives "${{ github.workspace }}/.apt-cache/";' | sudo tee /etc/apt/apt.conf.d/01custom-cache
+
+      - uses: actions/cache@v4
+        with:
+          path: $HOME/apt-cache
+          key: ${{ runner.os }}-apt-$APT_CACHE_HASH
+
+      - name: install jq and yq and xq
+        run: |
+          sudo apt-get update
+          sudo apt-get install jq pipx
+          pipx install yq
+          yq --version
+          jq --version
+
+      - name: PR create
+        id: pr
+        run: |
+          unset GITHUB_TOKEN
+          echo "${{ secrets.BAZEL_TOKEN }}" | gh auth login --with-token
+          gh auth status
+
+          # PRをブランチごとに作成(matrix.branch)
+          PR_BRANCH="PR-bazel-${{ matrix.branch }}"
+          PR_URL=$(gh pr create --base "${{ matrix.branch }}" --repo "$ORIGINAL_REPO" --head "phoepsilonix:$PR_BRANCH" --title "Update bazel to the $RELEASE_VERSION in the ${{ matrix.branch }}" --body "This pull request updates bazel to the latest release version $RELEASE_VERSION in the ${{ matrix.branch }}.")
+
+          pr_number=$(echo $PR_URL | awk -F'/' '{print $NF}')
+
+          # マージ可能か確認
+          mergeable=$(gh pr view $pr_number --repo "$ORIGINAL_REPO" --json mergeable -q '.mergeable')
+          if [ "$mergeable" != "MERGEABLE" ]; then
+            echo "PR is not mergeable. Exiting."
+            echo "MERGE_PR=false" >> $GITHUB_OUTPUT
+            #exit 0
+          fi
+
+          loop=0
+          while true; do
+            comments=$(gh api repos/$ORIGINAL_REPO/issues/$pr_number/comments --jq '.[]|select( .body|contains("Build") and contains("successful") and contains("buildbot.flathub.org") )|.body')
+            if [ ! -z "$comments" ]; then
+              echo "Build successful comment found"
+              echo "MERGE_PR=true" >> $GITHUB_OUTPUT
+              break
+            fi
+            echo "Waiting for build to complete..."
+            loop=$((loop+1))
+            if [[ $loop == 6 ]]; then
+              echo "Timeout for Waiting for build test."
+              exit 1
+            fi
+            sleep 600  # 10分待機
+          done
+
+          # Squash and Mergeを実行
+          unset GITHUB_TOKEN
+          echo "${{ secrets.BAZEL_TOKEN }}" | gh auth login --with-token
+          gh auth status
+          gh pr merge --repo "$ORIGINAL_REPO" $pr_number --squash --auto
