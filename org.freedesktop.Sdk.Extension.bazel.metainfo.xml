@@ -4,12 +4,13 @@
   <name>Bazel</name>
   <summary>Bazel build system</summary>
   <description>
-	  <p>This SDK extension enables you to build apps using the bazel build system.</p>
+    <p>This SDK extension enables you to build apps using the bazel build system.</p>
   </description>
   <url type="homepage">https://bazel.build/</url>
   <project_license>Apache-2.0</project_license>
   <metadata_license>CC0-1.0</metadata_license>
   <releases>
+    <release version="8.4.2" date="2025-10-01"/>
     <release version="8.3.1" date="2025-06-30"/>
     <release version="8.3.0" date="2025-06-23"/>
     <release version="8.2.1" date="2025-04-17"/>
