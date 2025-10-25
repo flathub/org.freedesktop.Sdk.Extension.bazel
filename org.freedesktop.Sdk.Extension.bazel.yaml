@@ -16,14 +16,14 @@ modules:
       - type: file
         only-arches:
           - x86_64
-        url: https://github.com/bazelbuild/bazel/releases/download/8.3.1/bazel-8.3.1-linux-x86_64
-        sha256: 17247e8a84245f59d3bc633d0cfe0a840992a7760a11af1a30012d03da31604c
+        url: https://github.com/bazelbuild/bazel/releases/download/8.4.2/bazel-8.4.2-linux-x86_64
+        sha256: 4dc8e99dfa802e252dac176d08201fd15c542ae78c448c8a89974b6f387c282c
         dest-filename: bazel
       - type: file
         only-arches:
           - aarch64
-        url: https://github.com/bazelbuild/bazel/releases/download/8.3.1/bazel-8.3.1-linux-arm64
-        sha256: 52bb74f0880ee87b17e3a1aa41257d0dba9e9cb92df4e83f8f6c656a46df152d
+        url: https://github.com/bazelbuild/bazel/releases/download/8.4.2/bazel-8.4.2-linux-arm64
+        sha256: 58e6042fc54f3bf5704452b579f575ae935817d4b842a76123f05fae6b1f9a83
         dest-filename: bazel
     build-commands:
       - chmod +x bazel
