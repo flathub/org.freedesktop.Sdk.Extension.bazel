@@ -16,14 +16,14 @@ modules:
       - type: file
         only-arches:
           - x86_64
-        url: https://github.com/bazelbuild/bazel/releases/download/9.0.0/bazel-9.0.0-linux-x86_64
-        sha256: c44a93f25398c68f904fa1d19b61d321de6c0d2f09dca375d7bc0dc9b9428403
+        url: https://github.com/bazelbuild/bazel/releases/download/9.0.1/bazel-9.0.1-linux-x86_64
+        sha256: b4746d3ee7e698b08ebc6a91bd6b4062a25d1b4214a5964f866986f59fc159fb
         dest-filename: bazel
       - type: file
         only-arches:
           - aarch64
-        url: https://github.com/bazelbuild/bazel/releases/download/9.0.0/bazel-9.0.0-linux-arm64
-        sha256: cab23c59d3d39c5e5382f12cd116b47445afdff9813516c18ae3ee8836b3037f
+        url: https://github.com/bazelbuild/bazel/releases/download/9.0.1/bazel-9.0.1-linux-arm64
+        sha256: f2f5277c38cc063085fc3f89afa0d23c35a0337718f945c6ed81aac44a1b8411
         dest-filename: bazel
     build-commands:
       - chmod +x bazel
