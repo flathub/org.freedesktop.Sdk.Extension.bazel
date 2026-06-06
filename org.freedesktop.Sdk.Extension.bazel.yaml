@@ -19,12 +19,25 @@ modules:
         url: https://github.com/bazelbuild/bazel/releases/download/9.1.0/bazel-9.1.0-linux-x86_64
         sha256: a667454f3f4f8878df8199136b82c199f6ada8477b337fae3b1ef854f01e4e2f
         dest-filename: bazel
+        x-checker-data:
+          type: github
+          repo: bazelbuild/bazel
+          tag-pattern: ^v?([\d.]+)$
+          url-template: https://github.com/bazelbuild/bazel/releases/download/$version/bazel-$version-linux-x86_64
+          appstream-changes: true
       - type: file
         only-arches:
           - aarch64
         url: https://github.com/bazelbuild/bazel/releases/download/9.1.0/bazel-9.1.0-linux-arm64
         sha256: ba933bfc943e4c44f0743a5823aa2312a34b39628532add5dd037e08d8ec27a4
         dest-filename: bazel
+        x-checker-data:
+          type: github
+          repo: bazelbuild/bazel
+          tag-pattern: ^v?([\d.]+)$
+          url-template: https://github.com/bazelbuild/bazel/releases/download/$version/bazel-$version-linux-arm64
+          appstream-changes: true
+
     build-commands:
       - chmod +x bazel
       - install -d /usr/lib/sdk/bazel/bin
