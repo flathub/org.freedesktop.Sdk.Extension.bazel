@@ -27,3 +27,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: --update --never-fork org.freedesktop.Sdk.Extension.bazel.yaml
+          #args: --check --verbose --check-outdated --require-important-update org.freedesktop.Sdk.Extension.bazel.yaml
+          #args: --update --edit-only --never-fork org.freedesktop.Sdk.Extension.bazel.yaml
