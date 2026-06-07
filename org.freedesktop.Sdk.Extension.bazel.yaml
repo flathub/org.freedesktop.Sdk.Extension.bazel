@@ -24,6 +24,7 @@ modules:
           repo: bazelbuild/bazel
           tag-pattern: ^v?([\d.]+)$
           url-template: https://github.com/bazelbuild/bazel/releases/download/$version/bazel-$version-linux-x86_64
+          version-scheme: semantic
           appstream-changes: true
       - type: file
         only-arches:
@@ -36,6 +37,7 @@ modules:
           repo: bazelbuild/bazel
           tag-pattern: ^v?([\d.]+)$
           url-template: https://github.com/bazelbuild/bazel/releases/download/$version/bazel-$version-linux-arm64
+          version-scheme: semantic
           appstream-changes: true
 
     build-commands:
