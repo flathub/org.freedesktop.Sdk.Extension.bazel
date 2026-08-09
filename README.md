@@ -8,7 +8,7 @@ To build things using bazel, add the following to your manifest file:
 add-build-extensions:
   org.freedesktop.Sdk.Extension.bazel:
     directory: lib/sdk/bazel
-    version: "24.08"
+    version: "25.08"
 build-options:
   append-path: /usr/lib/sdk/bazel/bin
 ```
